@@ -97,6 +97,8 @@ public:
 
     void regionGrowPlaneSegment(PointCloudTypePtr &input, std::vector<PlaneType> &planes);
 
+    bool planeFromPoint(PointCloudTypePtr &input, int index, PlaneType &plane);
+
 protected:
     void noCloudCallback (const sensor_msgs::ImageConstPtr& visual_img_msg,
                          const sensor_msgs::ImageConstPtr& depth_img_msg,
@@ -132,6 +134,12 @@ protected:
 
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr image2PointCloud( const cv::Mat &rgb_img, const cv::Mat &depth_img,
                                                             const PlaneFromLineSegment::CAMERA_PARAMETERS& camera );
+
+protected:
+    inline bool isValidPoint(const PointType &p)
+    {
+        return (prttcp_->isValid(p) && p.z > 0);
+    }
 
 private:
     ros::NodeHandle nh_;
@@ -208,6 +216,10 @@ private:
     // Plane segment based line segment
     PlaneFromLineSegment::CAMERA_PARAMETERS camera_parameters_;
     PlaneFromLineSegment plane_from_line_segment_;
+    //
+    bool is_extract_single_plane_;
+    int single_plane_row_;
+    int single_plane_col_;
 
     // Organized Muit Plane segment parameters
     OrganizedPlaneSegment organized_plane_segment_;

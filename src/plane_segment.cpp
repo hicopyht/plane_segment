@@ -19,6 +19,8 @@ PlaneSegment::PlaneSegment() :
   , camera_parameters_()
   , plane_from_line_segment_()
   , organized_plane_segment_()
+  , single_plane_row_( 200 )
+  , single_plane_col_( 200 )
 {
     nh_.setCallbackQueue(&my_callback_queue_);
 
@@ -148,7 +150,7 @@ void PlaneSegment::processCloud( PointCloudTypePtr &input )
     time.tic();
     float line_base_dura = 0, ransac_dura = 0;
     float organized_dura = 0, region_grow_dura = 0;
-    float display_dura = 0;
+    float single_plane_dura = 0, display_dura = 0;
     float total_dura = 0;
 
     // do segmentation
@@ -195,11 +197,27 @@ void PlaneSegment::processCloud( PointCloudTypePtr &input )
         region_grow_dura = time.toc();
         time.tic();
     }
+    //
+    std::vector<PlaneType> single_plane;
+    if(is_extract_single_plane_)
+    {
+        PlaneType sp;
+        int idx = single_plane_row_ * camera_parameters_.width + single_plane_col_;
+        cout << " - single idx: " << idx << endl;
+        if( planeFromPoint( input, idx, sp ) )
+        {
+            single_plane.push_back( sp );
+        }
+    }
+    single_plane_dura = time.toc();
+    time.tic();
+    //
 
     // display
     pcl_viewer_->removeAllPointClouds();
     pcl_viewer_->removeAllShapes();
     displayLinesAndNormals( input, lines, normals, viewer_v1_);
+    displayPlanes( input, single_plane, "single_plane", viewer_v1_ );
     displayPlanes( input, line_based_planes, "line_based_plane", viewer_v2_);
     displayPlanes( input, ransac_planes, "ransac_plane", viewer_v3_);
     displayPlanes( input, organized_planes, "organized_plane", viewer_v4_);
@@ -209,8 +227,9 @@ void PlaneSegment::processCloud( PointCloudTypePtr &input )
     display_dura = time.toc();
     total_dura = pcl::getTime() - start_time;
 
-    cout << YELLOW << " Time: LineB: " << line_base_dura << ", RANSAC: " << ransac_dura
-         << ", Organized: " << organized_dura << ", RegionGrow: " << region_grow_dura << RESET << endl;
+    cout << GREEN << " Time: LineB: " << line_base_dura << ", RANSAC: " << ransac_dura
+         << ", Organized: " << organized_dura << ", RegionGrow: " << region_grow_dura
+         << ", Single: " << single_plane_dura << RESET << endl;
     ROS_INFO("Total time: %f, display %f \n", total_dura, display_dura);
     cout << "----------------------------------- END -------------------------------------" << endl;
 }
@@ -225,8 +244,6 @@ void PlaneSegment::lineBasedPlaneSegment(PointCloudTypePtr &input, std::vector<P
         plane_from_line_segment_.setCameraParameters( camera_parameters_ );
         cout << "Initialize line base segment." << endl;
     }
-
-    std::vector<PlaneFromLineSegment::NormalType> line_based_planes;
 
     //
     if( is_update_line_based_parameters_ )
@@ -255,6 +272,7 @@ void PlaneSegment::lineBasedPlaneSegment(PointCloudTypePtr &input, std::vector<P
     }
 
     //
+    std::vector<PlaneFromLineSegment::NormalType> line_based_planes;
     plane_from_line_segment_.setInputCloud( cloud_in );
     plane_from_line_segment_.segment( line_based_planes );
 
@@ -368,6 +386,64 @@ void PlaneSegment::regionGrowPlaneSegment(PointCloudTypePtr &input, std::vector<
     pcl::copyPointCloud( *input, *cloud_in);
 }
 
+bool PlaneSegment::planeFromPoint(PointCloudTypePtr &input, int index, PlaneType &plane)
+{
+    if (!plane_from_line_segment_.isInitialized())
+    {
+        plane_from_line_segment_.setCameraParameters( camera_parameters_ );
+        cout << "Initialize line base segment." << endl;
+    }
+
+    //
+    if( is_update_line_based_parameters_ )
+    {
+        plane_from_line_segment_.setUseHorizontalLines( use_horizontal_line_ );
+        plane_from_line_segment_.setUseVerticleLines( use_verticle_line_ );
+        plane_from_line_segment_.setYskip( y_skip_ );
+        plane_from_line_segment_.setXSkip( x_skip_ );
+        plane_from_line_segment_.setLinePointMinDistance( line_point_min_distance_ );
+        plane_from_line_segment_.setRhoConstantError( scan_rho_constant_error_ );
+        plane_from_line_segment_.setRhoDistanceError( scan_rho_distance_error_ );
+        plane_from_line_segment_.setSlideWindowSize( slide_window_size_ );
+        plane_from_line_segment_.setLineMinInliers( line_min_inliers_ );
+        plane_from_line_segment_.setLineFittingThreshold( line_fitting_threshold_ );
+        plane_from_line_segment_.setNormalUseDepthSmoothing( normal_use_depth_dependent_smoothing_ );
+        plane_from_line_segment_.setNormalDepthChangeFactor( normal_max_depth_change_factor_ );
+        plane_from_line_segment_.setNormalSmoothingSize( normal_smoothing_size_ );
+        plane_from_line_segment_.setNormalMinInliers( normal_min_inliers_ );
+        plane_from_line_segment_.setNormalMaximumCurvature( normal_maximum_curvature_ );
+        plane_from_line_segment_.setMinInliers( min_inliers_ );
+        plane_from_line_segment_.setDistanceThreshold( distance_threshold_ );
+        plane_from_line_segment_.setNeighborThreshold( neighbor_threshold_ );
+        plane_from_line_segment_.setOptimizeCoefficients( optimize_coefficients_ );
+        plane_from_line_segment_.setProjectPoints( project_points_ );
+        is_update_line_based_parameters_ = false;
+    }
+
+    //
+    PlaneFromLineSegment::NormalType line_based_plane;
+    if( !isValidPoint( input->points[index] ))
+    {
+        cout << YELLOW << "Invalid point for single plane segment." << RESET << endl;
+        return false;
+    }
+    //
+    PointCloudTypePtr cloud_in (new PointCloudType);
+    pcl::copyPointCloud( *input, *cloud_in);
+    plane_from_line_segment_.setInputCloud( cloud_in );
+    if( !plane_from_line_segment_.initCompute() )
+    {
+        ROS_WARN("Cann't init compute for single plane segment.");
+        return false;
+    }
+    plane_from_line_segment_.segmentSinglePlane( index, line_based_plane);
+    plane.centroid = line_based_plane.centroid;
+    plane.coefficients = line_based_plane.coefficients;
+    plane.inlier = line_based_plane.inliers;
+    plane_from_line_segment_.deinitCompute();
+    return line_based_plane.valid;
+}
+
 void PlaneSegment::planeSegmentReconfigCallback(plane_segment::PlaneSegmentConfig &config, uint32_t level)
 {
     plane_segment_method_ = config.segment_method;
@@ -401,6 +477,10 @@ void PlaneSegment::lineBasedSegmentReconfigCallback(plane_segment::LineBasedSegm
     neighbor_threshold_ = config.neighbor_threshold;
     optimize_coefficients_ = config.optimize_coefficients;
     project_points_ = config.project_points;
+    //
+    is_extract_single_plane_ = config.is_extract_single_plane;
+    single_plane_row_ = config.single_plane_row;
+    single_plane_col_ = config.single_plane_col;
 
     cout << GREEN <<"Line Based Segment Config." << RESET << endl;
 
@@ -561,10 +641,9 @@ void PlaneSegment::getCameraParameter(const sensor_msgs::CameraInfoConstPtr &cam
     camera.fx = cam_info_msg->K[0];
     camera.fy = cam_info_msg->K[4];
     camera.scale = 1.0;
-
     // Additionally, organized cloud width and height.
-    camera.width = 640;
-    camera.height = 480;
+    camera.width = cam_info_msg->width;
+    camera.height = cam_info_msg->height;
 }
 
 pcl::PointCloud<pcl::PointXYZRGBA>::Ptr PlaneSegment::image2PointCloud( const cv::Mat &rgb_img, const cv::Mat &depth_img,
