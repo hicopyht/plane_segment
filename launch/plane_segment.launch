@@ -1,0 +1,11 @@
+<launch>
+
+    <node pkg="plane_segment" type="plane_segment" name="plane_segment_node" output="screen">
+        <param name="subscriber_queue_size" value="4" />
+        <param name="topic_image_visual" value="/camera/rgb/image_rect_color" />
+        <param name="topic_image_depth" value="/camera/depth_registered/image_rect" />
+        <param name="topic_camera_info" value="/camera/rgb/camera_info" />
+        <param name="topic_point_cloud" value="" />
+    </node>
+
+</launch>
