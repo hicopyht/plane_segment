@@ -26,6 +26,7 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   message_filters
   pcl_ros
+  rosbag
   roscpp
   sensor_msgs
   cv_bridge
@@ -51,6 +52,8 @@ generate_dynamic_reconfigure_options(
   cfg/LineBasedSegment.cfg
   cfg/RansacSegment.cfg
   cfg/OrganizedSegment.cfg
+  cfg/RegionGrowSegment.cfg
+  cfg/Viewer.cfg
 )
 
 
@@ -85,24 +88,58 @@ include_directories(
 )
 
 ## Declare a C++ library
-# add_library(plane_segment
-#   src/${PROJECT_NAME}/plane_segment.cpp
-# )
-
-
-## Declare a C++ executable
-add_executable(plane_segment src/plane_segment.cpp src/organized_plane_segment.cpp)
-
-## Add cmake target dependencies of the executable
-## same as for the library above
-add_dependencies(plane_segment ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(plane_segment ${PROJECT_NAME}_gencfg)
-
+add_library(${PROJECT_NAME}
+  src/plane_segment.cpp
+  src/organized_plane_segment.cpp
+  src/plane_viewer.cpp
+  src/utils.cpp
+)
+add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 ## Specify libraries to link a library or executable target against
-target_link_libraries(plane_segment
+target_link_libraries(${PROJECT_NAME}
     ${catkin_LIBRARIES}
     ${EIGEN3_LIBS}
     ${OpenCV_LIBS}
     ${PCL_LIBRARIES}
 )
 
+## Declare a C++ executable
+add_executable(plane_segment_node src/plane_segment_node.cpp)
+## Add cmake target dependencies of the executable
+## same as for the library above
+add_dependencies(plane_segment_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(plane_segment_node ${PROJECT_NAME}_gencfg)
+target_link_libraries(plane_segment_node
+    ${PROJECT_NAME}
+)
+
+## Declare a C++ executable
+add_executable(plane_segment_bagfile src/plane_segment_bagfile.cpp)
+## Add cmake target dependencies of the executable
+## same as for the library above
+add_dependencies(plane_segment_bagfile ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(plane_segment_bagfile ${PROJECT_NAME}_gencfg)
+target_link_libraries(plane_segment_bagfile
+    ${PROJECT_NAME}
+)
+
+## Declare a C++ executable
+add_executable(plane_segment_pcd src/plane_segment_pcb.cpp)
+## Add cmake target dependencies of the executable
+## same as for the library above
+add_dependencies(plane_segment_pcd ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(plane_segment_pcd ${PROJECT_NAME}_gencfg)
+target_link_libraries(plane_segment_pcd
+    ${PROJECT_NAME}
+)
+
+## Declare a C++ executable
+add_executable(plane_segment_bagfile_depth src/plane_segment_bagfile_depth.cpp)
+## Add cmake target dependencies of the executable
+## same as for the library above
+add_dependencies(plane_segment_bagfile_depth ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(plane_segment_bagfile_depth ${PROJECT_NAME}_gencfg)
+target_link_libraries(plane_segment_bagfile_depth
+    ${PROJECT_NAME}
+)
